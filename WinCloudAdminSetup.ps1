@@ -24,7 +24,7 @@ if (-not (Test-Admin)) {
     exit 1
 }
 
-Write-Host "🔍 Checking internet connectivity..."
+Write-Host " Checking internet connectivity..."
 try {
     Invoke-WebRequest -Uri "https://www.bing.com" -UseBasicParsing -TimeoutSec 10 | Out-Null
 } catch {
@@ -32,37 +32,37 @@ try {
     exit 1
 }
 
-Write-Host "🔍 Detecting operating system..."
+Write-Host " Detecting operating system..."
 $osCaption = (Get-CimInstance Win32_OperatingSystem).Caption
 $isServer = $osCaption -like '*Server*'
 
 # Ensure NuGet provider is available
 if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
-    Write-Host "📦 Installing NuGet provider..."
+    Write-Host " Installing NuGet provider..."
     Install-PackageProvider -Name NuGet -Force -Scope AllUsers
 }
 
 # ========== RSAT INSTALLATION ==========
 if ($isServer) {
-    Write-Host "🖥 Detected Windows Server — using Add-WindowsFeature..."
+    Write-Host "Detected Windows Server — using Add-WindowsFeature..."
     try {
         if (-not (Get-WindowsFeature GPMC).Installed) {
             Install-WindowsFeature GPMC -ErrorAction Stop
-            Write-Host "✅ Installed GPMC"
+            Write-Host "Installed GPMC"
         } else {
-            Write-Host "✔️ GPMC already installed"
+            Write-Host "GPMC already installed"
         }
         if (-not (Get-WindowsFeature RSAT-AD-PowerShell).Installed) {
             Install-WindowsFeature RSAT-AD-PowerShell -ErrorAction Stop
-            Write-Host "✅ Installed RSAT AD Tools"
+            Write-Host "Installed RSAT AD Tools"
         } else {
-            Write-Host "✔️ RSAT AD Tools already installed"
+            Write-Host "RSAT AD Tools already installed"
         }
     } catch {
-        Write-Warning ("❌ Failed to install server features: {0}" -f $_)
+        Write-Warning ("Failed to install server features: {0}" -f $_)
     }
 } else {
-    Write-Host "💻 Detected Windows Client — using Add-WindowsCapability..."
+    Write-Host "Detected Windows Client — using Add-WindowsCapability..."
     $rsatFeatures = @(
         "Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0",
         "Rsat.GroupPolicy.Management.Tools~~~~0.0.1.0"
@@ -71,14 +71,14 @@ if ($isServer) {
         try {
             $cap = Get-WindowsCapability -Online -Name $feature
             if ($cap.State -ne 'Installed') {
-                Write-Host "📦 Installing RSAT Feature: $feature..."
+                Write-Host " Installing RSAT Feature: $feature..."
                 Add-WindowsCapability -Online -Name $feature -ErrorAction Stop
-                Write-Host "✅ Installed $feature"
+                Write-Host "Installed $feature"
             } else {
-                Write-Host "✔️ RSAT Feature already installed: $feature"
+                Write-Host "RSAT Feature already installed: $feature"
             }
         } catch {
-            Write-Warning ("❌ Failed to install RSAT Feature {0}: {1}" -f $feature, $_)
+            Write-Warning ("Failed to install RSAT Feature {0}: {1}" -f $feature, $_)
         }
     }
 }
@@ -96,83 +96,83 @@ $modules = @(
     @{ Name = "Microsoft.Online.SharePoint.PowerShell"; Source = "PSGallery" }
 )
 
-Write-Host "🔍 Checking and installing/updating required PowerShell modules..."
+Write-Host " Checking and installing/updating required PowerShell modules..."
 foreach ($mod in $modules) {
     $installedModule = Get-Module -ListAvailable -Name $mod.Name | Sort-Object Version -Descending | Select-Object -First 1
     $latestModule = Find-Module -Name $mod.Name -Repository $mod.Source -ErrorAction SilentlyContinue
 
     if ($null -eq $installedModule) {
-        Write-Host "📦 Installing module: $($mod.Name)..."
+        Write-Host " Installing module: $($mod.Name)..."
         try {
             Install-Module -Name $mod.Name -Force -AllowClobber -Scope AllUsers -ErrorAction Stop
-            Write-Host "✅ Installed $($mod.Name)"
+            Write-Host "Installed $($mod.Name)"
         } catch {
-            Write-Warning ("❌ Failed to install {0}: {1}" -f $mod.Name, $_)
+            Write-Warning ("Failed to install {0}: {1}" -f $mod.Name, $_)
         }
     } elseif ($null -ne $latestModule -and $installedModule.Version -lt $latestModule.Version) {
         Write-Host ("⬆️  Updating module: {0} from {1} to {2}..." -f $mod.Name, $installedModule.Version, $latestModule.Version)
         try {
             Update-Module -Name $mod.Name -Force -ErrorAction Stop
-            Write-Host "✅ Updated $($mod.Name)"
+            Write-Host "Updated $($mod.Name)"
         } catch {
-            Write-Warning ("❌ Failed to update {0}: {1}" -f $mod.Name, $_)
+            Write-Warning ("Failed to update {0}: {1}" -f $mod.Name, $_)
         }
     } else {
-        Write-Host ("✔️ Module {0} is up-to-date (version {1})" -f $mod.Name, $installedModule.Version)
+        Write-Host ("Module {0} is up-to-date (version {1})" -f $mod.Name, $installedModule.Version)
     }
 }
 
 # ========== AZ CLI INSTALLATION & UPDATE ==========
-Write-Host "🔍 Checking for Azure CLI installation..."
+Write-Host " Checking for Azure CLI installation..."
 if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
-    Write-Host "📦 Installing Azure CLI..."
+    Write-Host " Installing Azure CLI..."
     $installer = "$env:TEMP\AzureCLI.msi"
     try {
         Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile $installer -UseBasicParsing
         Start-Process msiexec.exe -Wait -ArgumentList "/i `"$installer`" /quiet"
         Remove-Item $installer -Force
-        Write-Host "✅ Azure CLI installed. You may need to restart PowerShell."
+        Write-Host "Azure CLI installed. You may need to restart PowerShell."
     } catch {
-        Write-Warning ("❌ Failed to install Azure CLI: {0}" -f $_)
+        Write-Warning ("Failed to install Azure CLI: {0}" -f $_)
     }
 } else {
-    Write-Host "🔄 Ensuring Azure CLI is up-to-date..."
+    Write-Host "Ensuring Azure CLI is up-to-date..."
     try {
         & az upgrade --yes --only-show-errors
-        Write-Host "✅ Azure CLI is up-to-date."
+        Write-Host "Azure CLI is up-to-date."
     } catch {
-        Write-Warning ("❌ Failed to update Azure CLI: {0}" -f $_)
+        Write-Warning ("Failed to update Azure CLI: {0}" -f $_)
     }
 }
 
 # ========== Chocolatey INSTALLATION & UPDATE ==========
-Write-Host "🔍 Checking for Chocolatey installation..."
+Write-Host "Checking for Chocolatey installation..."
 $chocoExe = "$env:ProgramData\chocolatey\bin\choco.exe"
 if (-not (Test-Path $chocoExe)) {
-    Write-Host "📦 Installing Chocolatey..."
+    Write-Host " Installing Chocolatey..."
     try {
         Set-ExecutionPolicy Bypass -Scope Process -Force
-        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-        Write-Host "✅ Chocolatey installed."
+		[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+		iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')
+        Write-Host "Chocolatey installed."
     } catch {
-        Write-Warning ("❌ Failed to install Chocolatey: {0}" -f $_)
+        Write-Warning ("Failed to install Chocolatey: {0}" -f $_)
     }
 } else {
-    Write-Host "🔄 Ensuring Chocolatey is up-to-date..."
+    Write-Host "Ensuring Chocolatey is up-to-date..."
     try {
         & $chocoExe upgrade chocolatey -y --no-progress
-        Write-Host "✅ Chocolatey is up-to-date."
+        Write-Host "Chocolatey is up-to-date."
     } catch {
-        Write-Warning ("❌ Failed to update Chocolatey: {0}" -f $_)
+        Write-Warning ("Failed to update Chocolatey: {0}" -f $_)
     }
 
-    Write-Host "🔄 Upgrading all Chocolatey packages..."
+    Write-Host "Upgrading all Chocolatey packages..."
     try {
         & $chocoExe upgrade all -y --no-progress
-        Write-Host "✅ All Chocolatey packages are up-to-date."
+        Write-Host "All Chocolatey packages are up-to-date."
     } catch {
-        Write-Warning ("❌ Failed to upgrade Chocolatey packages: {0}" -f $_)
+        Write-Warning ("Failed to upgrade Chocolatey packages: {0}" -f $_)
     }
 }
 
@@ -199,7 +199,7 @@ if (Test-Path $logExpertDir) {
 }
 
 if (-not $logExpertExe) {
-    Write-Host "📦 Downloading LogExpert Portable (open-source log viewer)..."
+    Write-Host " Downloading LogExpert Portable (open-source log viewer)..."
     $zipFile = "$env:TEMP\LogExpert.zip"
     try {
         Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile -UseBasicParsing
@@ -211,47 +211,36 @@ if (-not $logExpertExe) {
         Remove-Item $zipFile -Force
         $logExpertExe = Get-ChildItem -Path $logExpertDir -Filter "LogExpert.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($logExpertExe) {
-            Write-Host "✅ LogExpert extracted to $($logExpertExe.DirectoryName)"
+            Write-Host "LogExpert extracted to $($logExpertExe.DirectoryName)"
         } else {
-            Write-Warning "❌ LogExpert.exe not found after extraction."
+            Write-Warning "LogExpert.exe not found after extraction."
         }
     } catch {
-        Write-Warning ("❌ Failed to install LogExpert: {0}" -f $_)
+        Write-Warning ("Failed to install LogExpert: {0}" -f $_)
     }
 } else {
-    Write-Host "✔️ LogExpert already present at $($logExpertExe.FullName)"
+    Write-Host "LogExpert already present at $($logExpertExe.FullName)"
 }
 
 # ========== m365 CLI (Microsoft 365 CLI) ==========
-Write-Host "🔍 Checking for Microsoft 365 CLI (m365)..."
+Write-Host " Checking for Microsoft 365 CLI (m365)..."
 if (-not (Get-Command m365 -ErrorAction SilentlyContinue)) {
     if (Get-Command npm -ErrorAction SilentlyContinue) {
-        Write-Host "📦 Installing Microsoft 365 CLI globally (requires Node.js/npm)..."
+        Write-Host " Installing Microsoft 365 CLI globally (requires Node.js/npm)..."
         try {
             npm install -g @pnp/cli-microsoft365
-            Write-Host "✅ Microsoft 365 CLI installed."
+            Write-Host "Microsoft 365 CLI installed."
         } catch {
-            Write-Warning ("❌ Failed to install Microsoft 365 CLI: {0}" -f $_)
+            Write-Warning ("Failed to install Microsoft 365 CLI: {0}" -f $_)
         }
     } else {
         Write-Warning "Node.js/npm not found. Install Node.js to use Microsoft 365 CLI (https://nodejs.org/)."
     }
 } else {
-    Write-Host "✔️ Microsoft 365 CLI already installed."
+    Write-Host "Microsoft 365 CLI already installed."
 }
 
 # ========== PowerShell Help Update ==========
-Write-Host "🔄 Would you like to update PowerShell Help for all modules? (This may take several minutes) [Y/N]"
-$updateHelpResponse = Read-Host
-if ($updateHelpResponse -eq 'Y') {
-    try {
-        Update-Help -Force -ErrorAction Continue
-        Write-Host "✅ PowerShell Help update attempted."
-    } catch {
-        Write-Warning ("❌ Failed to update PowerShell Help: {0}" -f $_)
-    }
-} else {
-    Write-Host "⏩ Skipped PowerShell Help update."
-}
+Update-Help -Force -ErrorAction Continue
 
-Write-Host "🎉 All dependencies and tools installed and/or updated successfully."
+Write-Host "All dependencies and tools installed and/or updated successfully."
