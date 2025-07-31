@@ -10,7 +10,6 @@
 #>
 
 $ScriptVersion = '1.0.0'
-
 Write-Host "==========================================="
 Write-Host "WinCloudAdminSetup.ps1 - Version $ScriptVersion"
 Write-Host "==========================================="
@@ -95,7 +94,6 @@ $modules = @(
     @{ Name = "SharePointPnPPowerShellOnline"; Source = "PSGallery" },
     @{ Name = "Defender"; Source = "PSGallery" },
     @{ Name = "Microsoft.Online.SharePoint.PowerShell"; Source = "PSGallery" }
-    # Optionally add "Microsoft.PowerApps.Administration.PowerShell", "Microsoft.PowerApps.PowerShell"
 )
 
 Write-Host "🔍 Checking and installing/updating required PowerShell modules..."
@@ -111,8 +109,7 @@ foreach ($mod in $modules) {
         } catch {
             Write-Warning ("❌ Failed to install {0}: {1}" -f $mod.Name, $_)
         }
-    }
-    elseif ($null -ne $latestModule -and $installedModule.Version -lt $latestModule.Version) {
+    } elseif ($null -ne $latestModule -and $installedModule.Version -lt $latestModule.Version) {
         Write-Host ("⬆️  Updating module: {0} from {1} to {2}..." -f $mod.Name, $installedModule.Version, $latestModule.Version)
         try {
             Update-Module -Name $mod.Name -Force -ErrorAction Stop
@@ -120,8 +117,7 @@ foreach ($mod in $modules) {
         } catch {
             Write-Warning ("❌ Failed to update {0}: {1}" -f $mod.Name, $_)
         }
-    }
-    else {
+    } else {
         Write-Host ("✔️ Module {0} is up-to-date (version {1})" -f $mod.Name, $installedModule.Version)
     }
 }
@@ -180,26 +176,42 @@ if (-not (Test-Path $chocoExe)) {
     }
 }
 
-# ========== LogExpert INSTALLATION (Log Viewer) ==========
-$logExpertPath = "C:\Tools\LogExpert.exe"
-if (-not (Test-Path $logExpertPath)) {
-    Write-Host "📦 Downloading LogExpert Portable (open-source log viewer)..."
-    $zipUrl = "https://github.com/zarunbal/LogExpert/releases/download/v1.9.17/LogExpert_1.9.17_Portable.zip"
-    $zipFile = "$env:TEMP\LogExpert.zip"
-    try {
-        Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile -UseBasicParsing
-        if (-not (Test-Path "C:\Tools")) {
-            New-Item -ItemType Directory -Path "C:\Tools" | Out-Null
-        }
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFile, "C:\Tools")
-        Remove-Item $zipFile -Force
-        Write-Host "✅ LogExpert extracted to C:\Tools"
-    } catch {
-        Write-Warning ("❌ Failed to install LogExpert: {0}" -f $_)
+    # Fetch latest LogExpert release zip URL from GitHub API
+    $apiUrl = "https://api.github.com/repos/zarunbal/LogExpert/releases/latest"
+try {
+    $release = Invoke-WebRequest -Uri $apiUrl -UseBasicParsing -Headers @{ "User-Agent" = "WinCloudAdminSetup" }
+    # ========== LogExpert INSTALLATION (Log Viewer) ==========
+    $logExpertDir = "C:\Tools"
+    $logExpertExe = $null
+    if (Test-Path $logExpertDir) {
+        $logExpertExe = Get-ChildItem -Path $logExpertDir -Filter "LogExpert.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
     }
-} else {
-    Write-Host "✔️ LogExpert already present at C:\Tools"
+    if (-not $logExpertExe) {
+        Write-Host "📦 Downloading LogExpert Portable (open-source log viewer)..."
+        $zipUrl = "https://github.com/zarunbal/LogExpert/releases/download/v1.9.17/LogExpert_1.9.17_Portable.zip"
+        $zipFile = "$env:TEMP\LogExpert.zip"
+        try {
+            Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile -UseBasicParsing
+            if (-not (Test-Path $logExpertDir)) {
+                New-Item -ItemType Directory -Path $logExpertDir | Out-Null
+            }
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFile, $logExpertDir)
+            Remove-Item $zipFile -Force
+            $logExpertExe = Get-ChildItem -Path $logExpertDir -Filter "LogExpert.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($logExpertExe) {
+                Write-Host "✅ LogExpert extracted to $($logExpertExe.DirectoryName)"
+            } else {
+                Write-Warning "❌ LogExpert.exe not found after extraction."
+            }
+        } catch {
+            Write-Warning ("❌ Failed to install LogExpert: {0}" -f $_)
+        }
+    } else {
+        Write-Host "✔️ LogExpert already present at $($logExpertExe.FullName)"
+    }
+} catch {
+    Write-Warning ("❌ Failed to fetch LogExpert release info: {0}" -f $_)
 }
 
 # ========== m365 CLI (Microsoft 365 CLI) ==========
@@ -221,12 +233,17 @@ if (-not (Get-Command m365 -ErrorAction SilentlyContinue)) {
 }
 
 # ========== PowerShell Help Update ==========
-Write-Host "🔄 Updating PowerShell Help for all modules..."
-try {
-    Update-Help -Force -ErrorAction Stop
-    Write-Host "✅ PowerShell Help updated."
-} catch {
-    Write-Warning ("❌ Failed to update PowerShell Help: {0}" -f $_)
+Write-Host "🔄 Would you like to update PowerShell Help for all modules? (This may take several minutes) [Y/N]"
+$updateHelpResponse = Read-Host
+if ($updateHelpResponse -eq 'Y') {
+    try {
+        Update-Help -Force -ErrorAction Continue
+        Write-Host "✅ PowerShell Help update attempted."
+    } catch {
+        Write-Warning ("❌ Failed to update PowerShell Help: {0}" -f $_)
+    }
+} else {
+    Write-Host "⏩ Skipped PowerShell Help update."
 }
 
 Write-Host "🎉 All dependencies and tools installed and/or updated successfully."
