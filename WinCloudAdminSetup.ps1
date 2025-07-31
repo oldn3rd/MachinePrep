@@ -176,42 +176,50 @@ if (-not (Test-Path $chocoExe)) {
     }
 }
 
-    # Fetch latest LogExpert release zip URL from GitHub API
-    $apiUrl = "https://api.github.com/repos/zarunbal/LogExpert/releases/latest"
+# ========== LogExpert INSTALLATION (Log Viewer) ==========
+$logExpertDir = "C:\Tools"
+$logExpertExe = $null
+
+# Fetch latest LogExpert release zip URL from GitHub API
+$apiUrl = "https://api.github.com/repos/zarunbal/LogExpert/releases/latest"
 try {
     $release = Invoke-WebRequest -Uri $apiUrl -UseBasicParsing -Headers @{ "User-Agent" = "WinCloudAdminSetup" }
-    # ========== LogExpert INSTALLATION (Log Viewer) ==========
-    $logExpertDir = "C:\Tools"
-    $logExpertExe = $null
-    if (Test-Path $logExpertDir) {
-        $logExpertExe = Get-ChildItem -Path $logExpertDir -Filter "LogExpert.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-    }
-    if (-not $logExpertExe) {
-        Write-Host "📦 Downloading LogExpert Portable (open-source log viewer)..."
+    $zipUrl = ($release.Content | ConvertFrom-Json).assets | Where-Object { $_.name -like "*Portable.zip" } | Select-Object -ExpandProperty browser_download_url
+    if (-not $zipUrl) {
+        # Fallback to static version if API parsing fails
         $zipUrl = "https://github.com/zarunbal/LogExpert/releases/download/v1.9.17/LogExpert_1.9.17_Portable.zip"
-        $zipFile = "$env:TEMP\LogExpert.zip"
-        try {
-            Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile -UseBasicParsing
-            if (-not (Test-Path $logExpertDir)) {
-                New-Item -ItemType Directory -Path $logExpertDir | Out-Null
-            }
-            Add-Type -AssemblyName System.IO.Compression.FileSystem
-            [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFile, $logExpertDir)
-            Remove-Item $zipFile -Force
-            $logExpertExe = Get-ChildItem -Path $logExpertDir -Filter "LogExpert.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($logExpertExe) {
-                Write-Host "✅ LogExpert extracted to $($logExpertExe.DirectoryName)"
-            } else {
-                Write-Warning "❌ LogExpert.exe not found after extraction."
-            }
-        } catch {
-            Write-Warning ("❌ Failed to install LogExpert: {0}" -f $_)
-        }
-    } else {
-        Write-Host "✔️ LogExpert already present at $($logExpertExe.FullName)"
     }
 } catch {
-    Write-Warning ("❌ Failed to fetch LogExpert release info: {0}" -f $_)
+    # Fallback to static version if API call fails
+    $zipUrl = "https://github.com/zarunbal/LogExpert/releases/download/v1.9.17/LogExpert_1.9.17_Portable.zip"
+}
+
+if (Test-Path $logExpertDir) {
+    $logExpertExe = Get-ChildItem -Path $logExpertDir -Filter "LogExpert.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+}
+
+if (-not $logExpertExe) {
+    Write-Host "📦 Downloading LogExpert Portable (open-source log viewer)..."
+    $zipFile = "$env:TEMP\LogExpert.zip"
+    try {
+        Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile -UseBasicParsing
+        if (-not (Test-Path $logExpertDir)) {
+            New-Item -ItemType Directory -Path $logExpertDir | Out-Null
+        }
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFile, $logExpertDir)
+        Remove-Item $zipFile -Force
+        $logExpertExe = Get-ChildItem -Path $logExpertDir -Filter "LogExpert.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($logExpertExe) {
+            Write-Host "✅ LogExpert extracted to $($logExpertExe.DirectoryName)"
+        } else {
+            Write-Warning "❌ LogExpert.exe not found after extraction."
+        }
+    } catch {
+        Write-Warning ("❌ Failed to install LogExpert: {0}" -f $_)
+    }
+} else {
+    Write-Host "✔️ LogExpert already present at $($logExpertExe.FullName)"
 }
 
 # ========== m365 CLI (Microsoft 365 CLI) ==========
