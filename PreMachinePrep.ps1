@@ -30,7 +30,14 @@ function Write-Log {
     param ([string]$Message, [string]$Level = "Info")
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $line = "[$timestamp][$Level] $Message"
+
+    $logDir = Split-Path -Path $LogFile -Parent
+    if (-not (Test-Path $logDir)) {
+        New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+    }
+
     Add-Content -Path $LogFile -Value $line
+
     if (-not $Silent) {
         $color = switch ($Level) {
             "Error"   { "Red" }
@@ -42,6 +49,7 @@ function Write-Log {
         Write-Host $line -ForegroundColor $color
     }
 }
+
 
 function Test-RebootPending {
     Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending'
