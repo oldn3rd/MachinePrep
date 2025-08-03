@@ -1,17 +1,17 @@
 <#
 .SYNOPSIS
-    Installs essential PowerShell modules, Azure CLI, RSAT, log viewers, Chocolatey, m365 CLI, and updates PowerShell help for administering Microsoft 365, Azure, and Windows environments.
+    Prepares a Windows admin workstation with required tools, PowerShell modules, and CLIs.
+
 .VERSION
     1.0.0
+
 .DESCRIPTION
-    Detects OS type, installs RSAT features, Azure CLI, LogExpert (log viewer), Chocolatey, m365 CLI, updates PowerShell help, and installs key PowerShell modules for cloud and on-prem administration.
-.NOTES
-    Run as Administrator. Requires Internet access.
+    This script installs essential tools via Chocolatey, key PowerShell modules for Microsoft 365 and Azure, and configures the local environment for admin use.
 #>
 
 $ScriptVersion = '1.0.0'
 Write-Host "==========================================="
-Write-Host "WinCloudAdminSetup.ps1 - Version $ScriptVersion"
+Write-Host "MachinePrep.ps1 - Version $ScriptVersion"
 Write-Host "==========================================="
 
 function Test-Admin {
@@ -93,7 +93,9 @@ $modules = @(
     @{ Name = "MicrosoftTeams"; Source = "PSGallery" },
     @{ Name = "SharePointPnPPowerShellOnline"; Source = "PSGallery" },
     @{ Name = "Defender"; Source = "PSGallery" },
-    @{ Name = "Microsoft.Online.SharePoint.PowerShell"; Source = "PSGallery" }
+    @{ Name = "Microsoft.Online.SharePoint.PowerShell"; Source = "PSGallery" },
+    @{ Name = "SharePointOnline"; Source = "PSGallery" },
+    @{ Name = "Teams"; Source = "PSGallery" }
 )
 
 Write-Host " Checking and installing/updating required PowerShell modules..."
@@ -145,83 +147,6 @@ if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
     }
 }
 
-# ========== Chocolatey INSTALLATION & UPDATE ==========
-Write-Host "Checking for Chocolatey installation..."
-$chocoExe = "$env:ProgramData\chocolatey\bin\choco.exe"
-if (-not (Test-Path $chocoExe)) {
-    Write-Host " Installing Chocolatey..."
-    try {
-        Set-ExecutionPolicy Bypass -Scope Process -Force
-		[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-		iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')
-        Write-Host "Chocolatey installed."
-    } catch {
-        Write-Warning ("Failed to install Chocolatey: {0}" -f $_)
-    }
-} else {
-    Write-Host "Ensuring Chocolatey is up-to-date..."
-    try {
-        & $chocoExe upgrade chocolatey -y --no-progress
-        Write-Host "Chocolatey is up-to-date."
-    } catch {
-        Write-Warning ("Failed to update Chocolatey: {0}" -f $_)
-    }
-
-    Write-Host "Upgrading all Chocolatey packages..."
-    try {
-        & $chocoExe upgrade all -y --no-progress
-        Write-Host "All Chocolatey packages are up-to-date."
-    } catch {
-        Write-Warning ("Failed to upgrade Chocolatey packages: {0}" -f $_)
-    }
-}
-
-# ========== LogExpert INSTALLATION (Log Viewer) ==========
-$logExpertDir = "C:\Tools"
-$logExpertExe = $null
-
-# Fetch latest LogExpert release zip URL from GitHub API
-$apiUrl = "https://api.github.com/repos/zarunbal/LogExpert/releases/latest"
-try {
-    $release = Invoke-WebRequest -Uri $apiUrl -UseBasicParsing -Headers @{ "User-Agent" = "WinCloudAdminSetup" }
-    $zipUrl = ($release.Content | ConvertFrom-Json).assets | Where-Object { $_.name -like "*Portable.zip" } | Select-Object -ExpandProperty browser_download_url
-    if (-not $zipUrl) {
-        # Fallback to static version if API parsing fails
-        $zipUrl = "https://github.com/zarunbal/LogExpert/releases/download/v1.9.17/LogExpert_1.9.17_Portable.zip"
-    }
-} catch {
-    # Fallback to static version if API call fails
-    $zipUrl = "https://github.com/zarunbal/LogExpert/releases/download/v1.9.17/LogExpert_1.9.17_Portable.zip"
-}
-
-if (Test-Path $logExpertDir) {
-    $logExpertExe = Get-ChildItem -Path $logExpertDir -Filter "LogExpert.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-}
-
-if (-not $logExpertExe) {
-    Write-Host " Downloading LogExpert Portable (open-source log viewer)..."
-    $zipFile = "$env:TEMP\LogExpert.zip"
-    try {
-        Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile -UseBasicParsing
-        if (-not (Test-Path $logExpertDir)) {
-            New-Item -ItemType Directory -Path $logExpertDir | Out-Null
-        }
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFile, $logExpertDir)
-        Remove-Item $zipFile -Force
-        $logExpertExe = Get-ChildItem -Path $logExpertDir -Filter "LogExpert.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($logExpertExe) {
-            Write-Host "LogExpert extracted to $($logExpertExe.DirectoryName)"
-        } else {
-            Write-Warning "LogExpert.exe not found after extraction."
-        }
-    } catch {
-        Write-Warning ("Failed to install LogExpert: {0}" -f $_)
-    }
-} else {
-    Write-Host "LogExpert already present at $($logExpertExe.FullName)"
-}
-
 # ========== m365 CLI (Microsoft 365 CLI) ==========
 Write-Host " Checking for Microsoft 365 CLI (m365)..."
 if (-not (Get-Command m365 -ErrorAction SilentlyContinue)) {
@@ -234,7 +159,7 @@ if (-not (Get-Command m365 -ErrorAction SilentlyContinue)) {
             Write-Warning ("Failed to install Microsoft 365 CLI: {0}" -f $_)
         }
     } else {
-        Write-Warning "Node.js/npm not found. Install Node.js to use Microsoft 365 CLI (https://nodejs.org/)."
+        Write-Host "Node.js/npm not found. Microsoft 365 CLI was skipped."
     }
 } else {
     Write-Host "Microsoft 365 CLI already installed."
