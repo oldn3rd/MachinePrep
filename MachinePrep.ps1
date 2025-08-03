@@ -5,8 +5,8 @@
 .VERSION
     1.0.0
 
-.DESCRIPTION
-    This script installs essential tools via Chocolatey, key PowerShell modules for Microsoft 365 and Azure, and configures the local environment for admin use.
+.SYNOPSIS
+    Prepares a machine for administrative use by installing PowerShell modules, Azure CLI, RSAT, Chocolatey, m365 CLI, and tools for managing Microsoft 365, Intune, Azure, and Windows.
 #>
 
 $ScriptVersion = '1.0.0'
@@ -26,7 +26,7 @@ if (-not (Test-Admin)) {
 
 Write-Host " Checking internet connectivity..."
 try {
-    Invoke-WebRequest -Uri "https://www.bing.com" -UseBasicParsing -TimeoutSec 10 | Out-Null
+    Invoke-WebRequest -Uri "https://www.google.com" -UseBasicParsing -TimeoutSec 10 | Out-Null
 } catch {
     Write-Warning "No internet connectivity. Please connect and rerun."
     exit 1
@@ -85,17 +85,17 @@ if ($isServer) {
 
 # ========== PowerShell Module Install/Update ==========
 $modules = @(
-    @{ Name = "Microsoft.Graph"; Source = "PSGallery" },
-    @{ Name = "ExchangeOnlineManagement"; Source = "PSGallery" },
-    @{ Name = "AzureAD"; Source = "PSGallery" },
-    @{ Name = "MSOnline"; Source = "PSGallery" },
-    @{ Name = "Az"; Source = "PSGallery" },
-    @{ Name = "MicrosoftTeams"; Source = "PSGallery" },
-    @{ Name = "SharePointPnPPowerShellOnline"; Source = "PSGallery" },
-    @{ Name = "Defender"; Source = "PSGallery" },
-    @{ Name = "Microsoft.Online.SharePoint.PowerShell"; Source = "PSGallery" },
-    @{ Name = "SharePointOnline"; Source = "PSGallery" },
-    @{ Name = "Teams"; Source = "PSGallery" }
+    @{ Name = "Microsoft.Graph"; Source = "PSGallery" },                                # Unified Graph SDK
+    @{ Name = "Microsoft.Graph.Intune"; Source = "PSGallery" },                         # (Optional) Intune-specific module
+    @{ Name = "ExchangeOnlineManagement"; Source = "PSGallery" },                       # Exchange Online PowerShell v2
+    @{ Name = "AzureAD"; Source = "PSGallery" },                                        # Azure AD (legacy, still needed in some cases)
+    @{ Name = "MSOnline"; Source = "PSGallery" },                                       # MSOL module (legacy, still used by some scripts)
+    @{ Name = "Az"; Source = "PSGallery" },                                             # Azure PowerShell (Az.* cmdlets)
+    @{ Name = "MicrosoftTeams"; Source = "PSGallery" },                                 # Teams administration
+    @{ Name = "Defender"; Source = "PSGallery" },                                       # Microsoft Defender management
+    @{ Name = "SharePointPnPPowerShellOnline"; Source = "PSGallery" },                 # PnP module for SharePoint/Teams/Groups automation
+    @{ Name = "Microsoft.Online.SharePoint.PowerShell"; Source = "PSGallery" },        # SharePoint tenant admin (Connect-SPOService)
+    @{ Name = "Teams"; Source = "PSGallery" }                                           # Legacy Teams module (usually safe to drop, but retained for backward compatibility)
 )
 
 Write-Host " Checking and installing/updating required PowerShell modules..."
