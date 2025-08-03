@@ -1,16 +1,16 @@
 <#
 .SYNOPSIS
-    Bootstraps a workstation: installs Git + Chocolatey, clones the MachinePrep repo, launches it.
+    Bootstraps a workstation: installs Git + Chocolatey, clones MachinePrep repo, and launches it.
 .PARAMETER TargetPath
-    Folder to clone into. Defaults to current directory.
+    Folder to clone into (default: current directory). Repo will be placed in TargetPath\MachinePrep
 .PARAMETER ForceReinstall
-    Reinstalls Git and Chocolatey even if present.
+    Reinstalls Git and Chocolatey even if already installed.
 .PARAMETER Silent
-    Suppresses all Write-Host output.
+    Suppresses all console output.
 .PARAMETER NoBanner
-    Suppresses the startup header only.
+    Suppresses startup banner only.
 .NOTES
-    Version: 1.6
+    Version: 1.7
     Author: oldn3rd
 #>
 
@@ -22,6 +22,7 @@ param (
     [switch]$NoBanner
 )
 
+# === Functions ===
 function Write-Log {
     param ([string]$Message, [string]$Level = "Info")
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -42,23 +43,28 @@ function Test-RebootPending {
     return Test-Path $key
 }
 
-# === Defaults ===
+# === Path Setup ===
 if (-not $TargetPath) { $TargetPath = (Get-Location).Path }
-$RepoUrl = "https://github.com/oldn3rd/MachinePrep.git"
-$ScriptPath = Join-Path $TargetPath "MachinePrep.ps1"
-$LogFile = Join-Path $TargetPath "bootstrap.log"
+
+$RepoSubDir = "MachinePrep"
+$RepoPath   = Join-Path $TargetPath $RepoSubDir
+$ScriptPath = Join-Path $RepoPath "MachinePrep.ps1"
+$LogFile    = Join-Path $RepoPath "bootstrap.log"
+$gitDir     = Join-Path $RepoPath ".git"
+$RepoUrl    = "https://github.com/oldn3rd/MachinePrep.git"
 
 # === Startup Banner ===
 if (-not $NoBanner -and -not $Silent) {
-    $ver = "1.6"
+    $ver = "1.7"
     $now = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     Write-Host "PreMachinePrep.ps1 - Version $ver (Started $now)"
-    Write-Host "Target Path: $TargetPath"
+    Write-Host "Working Directory: $TargetPath"
+    Write-Host "Repo Target: $RepoPath"
     Write-Host "=============================================="
 }
 Write-Log "==== PreMachinePrep Start ===="
 
-# === Reboot check ===
+# === Reboot Check ===
 if (Test-RebootPending) {
     Write-Log "System has a pending reboot." "Warning"
 }
@@ -96,24 +102,21 @@ if (-not $gitInstalled -or $ForceReinstall) {
     Write-Log "Git is already installed."
 }
 
-# === Repo check ===
-$existingPath = Test-Path $TargetPath
-$gitDir = Join-Path $TargetPath ".git"
-
+# === Repo Cloning ===
 try {
-    if (-not $existingPath) {
-        Write-Log "Cloning repo to: $TargetPath"
-        git clone $RepoUrl $TargetPath
+    if (-not (Test-Path $RepoPath)) {
+        Write-Log "Cloning MachinePrep repo to: $RepoPath"
+        git clone $RepoUrl $RepoPath
     }
     elseif (-not (Test-Path $gitDir)) {
-        Write-Log "Target path exists but is not a Git repo." "Warning"
-        Write-Log "Removing folder and re-cloning..."
-        Remove-Item -Recurse -Force -Path $TargetPath
-        git clone $RepoUrl $TargetPath
+        Write-Log "Folder $RepoPath exists but is not a Git repo." "Warning"
+        Write-Log "Removing and re-cloning..."
+        Remove-Item -Recurse -Force -Path $RepoPath
+        git clone $RepoUrl $RepoPath
     }
     else {
         Write-Log "Repo folder exists. Pulling latest changes..."
-        Push-Location $TargetPath
+        Push-Location $RepoPath
         git pull
         Pop-Location
     }
@@ -123,7 +126,7 @@ catch {
     exit 20
 }
 
-# === Run main script ===
+# === Launch Script ===
 if (Test-Path $ScriptPath) {
     Write-Log "Launching MachinePrep.ps1..."
     try {
