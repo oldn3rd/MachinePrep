@@ -12,7 +12,7 @@
 .PARAMETER DebugOutput
     Enables extra verbose logging
 .NOTES
-    Version: 1.8
+    Version: 1.8.1
     Author: oldn3rd
 #>
 
@@ -68,7 +68,7 @@ $RepoUrl    = "https://github.com/oldn3rd/MachinePrep.git"
 
 # ========== Startup ==========
 if (-not $NoBanner -and -not $Silent) {
-    Write-Host "PreMachinePrep.ps1 - Version 1.8"
+    Write-Host "PreMachinePrep.ps1 - Version 1.8.1"
     Write-Host "Target Path: $RepoPath"
     Write-Host "=========================================="
 }
