@@ -1,75 +1,54 @@
-# PreMachinePrep.ps1
-# Bootstraps a workstation: installs Git/Chocolatey, pulls MachinePrep repo, runs MachinePrep.ps1
+<#
+.SYNOPSIS
+    Bootstraps a fresh Windows workstation by cloning the MachinePrep repo and launching the main setup script.
+.DESCRIPTION
+    Clones the GitHub repository to a local folder and launches MachinePrep.ps1. Assumes Git is installed.
+.PARAMETER TargetPath
+    Optional. The folder to clone into. Defaults to the current script directory.
+.NOTES
+    Author: oldn3rd
+    Version: 1.1.0
+#>
 
-$RepoUrl     = 'https://github.com/oldn3rd/MachinePrep.git'
-$OneDrive    = [Environment]::GetEnvironmentVariable("OneDrive", "Machine")
-$LocalPath   = Join-Path $OneDrive "GITHUB Repo\MachinePrep"
-$ScriptToRun = 'MachinePrep.ps1'
+param(
+    [string]$TargetPath = $PSScriptRoot
+)
 
-function Ensure-Chocolatey {
-    if (Get-Command choco -ErrorAction SilentlyContinue) {
-        Write-Host "Chocolatey is already installed."
-        return
-    }
+$RepoUrl    = "https://github.com/oldn3rd/MachinePrep.git"
+$LocalPath  = $TargetPath
+$ScriptPath = Join-Path $LocalPath "MachinePrep.ps1"
 
-    Write-Host "Installing Chocolatey..."
-    Set-ExecutionPolicy Bypass -Scope Process -Force
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+Write-Host "=============================================="
+Write-Host " PreMachinePrep.ps1 - MachinePrep Bootstrap   "
+Write-Host "=============================================="
+Write-Host " Target Path: $LocalPath"
+Write-Host ""
 
-    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
-        throw "Chocolatey installation failed."
-    }
-}
-
-function Ensure-Git {
-    if (Get-Command git -ErrorAction SilentlyContinue) {
-        Write-Host "Git is already installed."
-        return
-    }
-
-    Write-Host "Installing Git via Chocolatey..."
-    choco install git -y --no-progress
-
-    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        throw "Git installation failed."
-    }
-}
-
-function Clone-Or-Pull-Repo {
-    if (Test-Path $LocalPath) {
-        Write-Host "Repo already exists. Pulling latest..."
-        Set-Location $LocalPath
-        git pull
-    } else {
-        Write-Host "Cloning repo to $LocalPath..."
-        git clone $RepoUrl $LocalPath
-        Set-Location $LocalPath
-    }
-}
-
-function Run-PrepScript {
-    $ScriptFullPath = Join-Path $LocalPath $ScriptToRun
-    if (-not (Test-Path $ScriptFullPath)) {
-        throw "Script not found: $ScriptFullPath"
-    }
-
-    Write-Host "Unblocking and executing: $ScriptToRun"
-    Unblock-File -Path $ScriptFullPath
-
-    try {
-        & $ScriptFullPath
-    } catch {
-        Write-Error "Script execution failed: $_"
-    }
-}
-
-# Main logic
 try {
-    Ensure-Chocolatey
-    Ensure-Git
-    Clone-Or-Pull-Repo
-    Run-PrepScript
-} catch {
-    Write-Error "Setup failed: $_"
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        Write-Error "❌ Git is not installed or not in PATH. Please install Git and try again."
+        exit 1
+    }
+
+    if (-not (Test-Path $LocalPath)) {
+        Write-Host "📥 Cloning MachinePrep repo to: $LocalPath..."
+        git clone $RepoUrl $LocalPath
+    } else {
+        Write-Host "🔄 Repo already exists. Pulling latest changes..."
+        Push-Location $LocalPath
+        git pull
+        Pop-Location
+    }
+
+    if (Test-Path $ScriptPath) {
+        Write-Host "🚀 Launching MachinePrep.ps1..."
+        & $ScriptPath
+    } else {
+        Write-Error "❌ MachinePrep.ps1 not found at: $ScriptPath"
+        exit 1
+    }
+}
+catch {
+    Write-Error "❌ Setup failed: $_"
+    exit 1
 }
