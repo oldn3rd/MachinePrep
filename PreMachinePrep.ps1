@@ -9,6 +9,7 @@
     Author: oldn3rd
     Version: 1.1.0
 #>
+Write-Host "✔️ Running PreMachinePrep.ps1 - Version 1.1.0 (Updated $(Get-Date -Format 'yyyy-MM-dd'))"
 
 param(
     [string]$TargetPath = $PSScriptRoot
