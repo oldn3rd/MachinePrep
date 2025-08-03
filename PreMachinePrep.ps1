@@ -4,17 +4,22 @@
 .DESCRIPTION
     Clones the GitHub repository to a local folder and launches MachinePrep.ps1. Assumes Git is installed.
 .PARAMETER TargetPath
-    Optional. The folder to clone into. Defaults to the current script directory.
+    Optional. The folder to clone into. Defaults to current directory if not specified.
 .NOTES
     Author: oldn3rd
-    Version: 1.1.2
+    Version: 1.1.4
 #>
 
 param (
-    [string]$TargetPath = $PSScriptRoot
+    [string]$TargetPath
 )
 
-Write-Host "PreMachinePrep.ps1 - Version 1.1.2 (Updated $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"
+# Default to current working directory if not specified
+if (-not $TargetPath) {
+    $TargetPath = (Get-Location).Path
+}
+
+Write-Host "PreMachinePrep.ps1 - Version 1.1.4 (Updated $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"
 
 $RepoUrl    = "https://github.com/oldn3rd/MachinePrep.git"
 $LocalPath  = $TargetPath
