@@ -7,15 +7,14 @@
     Optional. The folder to clone into. Defaults to the current script directory.
 .NOTES
     Author: oldn3rd
-    Version: 1.1.1
+    Version: 1.1.2
 #>
 
-Write-Host "PreMachinePrep.ps1 - Version 1.1.1 (Updated $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"
-
-
-param(
+param (
     [string]$TargetPath = $PSScriptRoot
 )
+
+Write-Host "PreMachinePrep.ps1 - Version 1.1.2 (Updated $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"
 
 $RepoUrl    = "https://github.com/oldn3rd/MachinePrep.git"
 $LocalPath  = $TargetPath
@@ -37,7 +36,7 @@ try {
         Write-Host "Cloning MachinePrep repo to: $LocalPath..."
         git clone $RepoUrl $LocalPath
     } else {
-        Write-Host "Repo already exists. Pulling latest changes..."
+        Write-Host "Repository already exists. Pulling latest changes..."
         Push-Location $LocalPath
         git pull
         Pop-Location
