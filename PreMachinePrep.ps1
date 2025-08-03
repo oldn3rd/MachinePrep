@@ -7,8 +7,9 @@
     Optional. The folder to clone into. Defaults to the current script directory.
 .NOTES
     Author: oldn3rd
-    Version: 1.1.0
+    Version: 1.1.1
 #>
+
 Write-Host "PreMachinePrep.ps1 - Version 1.1.1 (Updated $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"
 
 
