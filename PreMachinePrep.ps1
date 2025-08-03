@@ -9,7 +9,7 @@
     Author: oldn3rd
     Version: 1.1.0
 #>
-Write-Host "✔️ PreMachinePrep.ps1 - Version 1.1.1 (Updated $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"
+Write-Host "PreMachinePrep.ps1 - Version 1.1.1 (Updated $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"
 
 
 param(
