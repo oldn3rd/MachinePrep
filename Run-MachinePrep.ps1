@@ -2,12 +2,8 @@
 # Bootstraps a workstation: installs Git/Chocolatey, pulls MachinePrep repo, runs MachinePrep.ps1
 
 $RepoUrl     = 'https://github.com/oldn3rd/MachinePrep.git'
-$gitHome     = Join-Path "$env:OneDriveCommercial" "GITHUB Repo"
-$LocalPath   = Join-Path $gitHome "MachinePrep"
+$LocalPath   = "$env:OneDrive\GITHUB Repo\MachinePrep"
 $ScriptToRun = 'MachinePrep.ps1'
-
-# Set environment variable for repo root (machine-wide)
-[Environment]::SetEnvironmentVariable("GIT_HOME", $gitHome, [EnvironmentVariableTarget]::Machine)
 
 function Ensure-Chocolatey {
     if (Get-Command choco -ErrorAction SilentlyContinue) {
@@ -18,7 +14,7 @@ function Ensure-Chocolatey {
     Write-Host "Installing Chocolatey..."
     Set-ExecutionPolicy Bypass -Scope Process -Force
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+    Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
 
     if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
         throw "Chocolatey installation failed."
