@@ -1,62 +1,69 @@
 <#
 .SYNOPSIS
-    Bootstraps a Windows workstation by installing Git + Chocolatey, cloning the MachinePrep repo, and launching it.
-.DESCRIPTION
-    Self-contained setup script. Handles missing dependencies, reboot warnings, logging, and summary popup.
+    Bootstraps a workstation: installs Git + Chocolatey, clones the MachinePrep repo, launches it.
 .PARAMETER TargetPath
-    Local folder to clone the repo into. Defaults to current directory.
+    Folder to clone into. Defaults to current directory.
 .PARAMETER ForceReinstall
-    Forces reinstall of Chocolatey and Git even if already installed.
+    Reinstalls Git and Chocolatey even if present.
+.PARAMETER Silent
+    Suppresses all Write-Host output.
+.PARAMETER NoBanner
+    Suppresses the startup header only.
 .NOTES
-    Version: 1.5.0
+    Version: 1.6
     Author: oldn3rd
 #>
 
 [CmdletBinding()]
 param (
     [string]$TargetPath,
-    [switch]$ForceReinstall
+    [switch]$ForceReinstall,
+    [switch]$Silent,
+    [switch]$NoBanner
 )
 
-# === Functions ===
 function Write-Log {
-    param ([string]$Message)
+    param ([string]$Message, [string]$Level = "Info")
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $line = "[$timestamp] $Message"
-    Write-Host $line
+    $line = "[$timestamp][$Level] $Message"
     Add-Content -Path $LogFile -Value $line
-}
-
-function Show-Popup {
-    param ([string]$Message, [string]$Title = "PreMachinePrep")
-    if ($Host.UI.RawUI.WindowTitle) {
-        Add-Type -AssemblyName System.Windows.Forms
-        [System.Windows.Forms.MessageBox]::Show($Message, $Title, 'OK', 'Information') | Out-Null
+    if (-not $Silent) {
+        $color = switch ($Level) {
+            "Error"   { "Red" }
+            "Warning" { "Yellow" }
+            default   { "Gray" }
+        }
+        Write-Host $line -ForegroundColor $color
     }
 }
 
 function Test-RebootPending {
-    $pending = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending" -ErrorAction SilentlyContinue
-    return $null -ne $pending
+    $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending'
+    return Test-Path $key
 }
 
-# === Start ===
-$StartTime = Get-Date
+# === Defaults ===
 if (-not $TargetPath) { $TargetPath = (Get-Location).Path }
-$LogFile = Join-Path $TargetPath "bootstrap.log"
 $RepoUrl = "https://github.com/oldn3rd/MachinePrep.git"
 $ScriptPath = Join-Path $TargetPath "MachinePrep.ps1"
+$LogFile = Join-Path $TargetPath "bootstrap.log"
 
-Write-Host "PreMachinePrep.ps1 - Version 1.5.0 (Started $($StartTime.ToString("yyyy-MM-dd HH:mm:ss")))"
-Write-Host "Target Path: $TargetPath"
-"==== PreMachinePrep Log Started at $($StartTime.ToString("yyyy-MM-dd HH:mm:ss")) ====" | Out-File $LogFile
+# === Startup Banner ===
+if (-not $NoBanner -and -not $Silent) {
+    $ver = "1.6"
+    $now = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    Write-Host "PreMachinePrep.ps1 - Version $ver (Started $now)"
+    Write-Host "Target Path: $TargetPath"
+    Write-Host "=============================================="
+}
+Write-Log "==== PreMachinePrep Start ===="
 
-# === Check for reboot pending ===
+# === Reboot check ===
 if (Test-RebootPending) {
-    Write-Log "WARNING: System has a pending reboot."
+    Write-Log "System has a pending reboot." "Warning"
 }
 
-# === Chocolatey install ===
+# === Chocolatey ===
 $chocoInstalled = Get-Command choco.exe -ErrorAction SilentlyContinue
 if (-not $chocoInstalled -or $ForceReinstall) {
     Write-Log "Installing Chocolatey..."
@@ -66,15 +73,14 @@ if (-not $chocoInstalled -or $ForceReinstall) {
         iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
         Write-Log "Chocolatey installed successfully."
     } catch {
-        Write-Log "ERROR: Chocolatey install failed: $_"
-        Show-Popup "Setup failed during Chocolatey installation." "PreMachinePrep"
+        Write-Log "Chocolatey install failed: $_" "Error"
         exit 10
     }
 } else {
     Write-Log "Chocolatey is already installed."
 }
 
-# === Git install ===
+# === Git ===
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine")
 $gitInstalled = Get-Command git.exe -ErrorAction SilentlyContinue
 if (-not $gitInstalled -or $ForceReinstall) {
@@ -83,46 +89,53 @@ if (-not $gitInstalled -or $ForceReinstall) {
         choco install git -y --no-progress
         Write-Log "Git installed successfully."
     } catch {
-        Write-Log "ERROR: Git install failed: $_"
-        Show-Popup "Setup failed during Git installation." "PreMachinePrep"
+        Write-Log "Git install failed: $_" "Error"
         exit 11
     }
 } else {
     Write-Log "Git is already installed."
 }
 
-# === Clone repo ===
+# === Repo check ===
+$existingPath = Test-Path $TargetPath
+$gitDir = Join-Path $TargetPath ".git"
+
 try {
-    if (-not (Test-Path $TargetPath)) {
-        Write-Log "Cloning MachinePrep repo to: $TargetPath"
+    if (-not $existingPath) {
+        Write-Log "Cloning repo to: $TargetPath"
         git clone $RepoUrl $TargetPath
-    } else {
+    }
+    elseif (-not (Test-Path $gitDir)) {
+        Write-Log "Target path exists but is not a Git repo." "Warning"
+        Write-Log "Removing folder and re-cloning..."
+        Remove-Item -Recurse -Force -Path $TargetPath
+        git clone $RepoUrl $TargetPath
+    }
+    else {
         Write-Log "Repo folder exists. Pulling latest changes..."
         Push-Location $TargetPath
         git pull
         Pop-Location
     }
-} catch {
-    Write-Log "ERROR: Git clone/pull failed: $_"
-    Show-Popup "Failed to pull MachinePrep repo. See bootstrap.log." "PreMachinePrep"
+}
+catch {
+    Write-Log "Git clone/pull failed: $_" "Error"
     exit 20
 }
 
-# === Launch MachinePrep.ps1 ===
+# === Run main script ===
 if (Test-Path $ScriptPath) {
     Write-Log "Launching MachinePrep.ps1..."
     try {
         & $ScriptPath
-        Write-Log "MachinePrep.ps1 completed."
-        Show-Popup "MachinePrep completed successfully." "PreMachinePrep"
+        Write-Log "MachinePrep.ps1 executed successfully."
+        Write-Log "==== PreMachinePrep Completed ===="
         exit 0
     } catch {
-        Write-Log "ERROR: Failed to launch MachinePrep.ps1: $_"
-        Show-Popup "MachinePrep.ps1 execution failed. See bootstrap.log." "PreMachinePrep"
+        Write-Log "MachinePrep.ps1 failed: $_" "Error"
         exit 30
     }
 } else {
-    Write-Log "ERROR: MachinePrep.ps1 not found at $ScriptPath"
-    Show-Popup "MachinePrep.ps1 not found. Check repo." "PreMachinePrep"
+    Write-Log "MachinePrep.ps1 not found at $ScriptPath" "Error"
     exit 40
 }
