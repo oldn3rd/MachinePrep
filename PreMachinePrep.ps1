@@ -9,7 +9,7 @@
     Author: oldn3rd
     Version: 1.1.0
 #>
-Write-Host "✔️ Running PreMachinePrep.ps1 - Version 1.1.0 (Updated $(Get-Date -Format 'yyyy-MM-dd'))"
+Write-Host "Running PreMachinePrep.ps1 - Version 1.1.0 (Updated $(Get-Date -Format 'yyyy-MM-dd'))"
 
 param(
     [string]$TargetPath = $PSScriptRoot
@@ -27,29 +27,29 @@ Write-Host ""
 
 try {
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        Write-Error "❌ Git is not installed or not in PATH. Please install Git and try again."
+        Write-Error "Git is not installed or not in PATH. Please install Git and try again."
         exit 1
     }
 
     if (-not (Test-Path $LocalPath)) {
-        Write-Host "📥 Cloning MachinePrep repo to: $LocalPath..."
+        Write-Host "Cloning MachinePrep repo to: $LocalPath..."
         git clone $RepoUrl $LocalPath
     } else {
-        Write-Host "🔄 Repo already exists. Pulling latest changes..."
+        Write-Host "Repo already exists. Pulling latest changes..."
         Push-Location $LocalPath
         git pull
         Pop-Location
     }
 
     if (Test-Path $ScriptPath) {
-        Write-Host "🚀 Launching MachinePrep.ps1..."
+        Write-Host "Launching MachinePrep.ps1..."
         & $ScriptPath
     } else {
-        Write-Error "❌ MachinePrep.ps1 not found at: $ScriptPath"
+        Write-Error "MachinePrep.ps1 not found at: $ScriptPath"
         exit 1
     }
 }
 catch {
-    Write-Error "❌ Setup failed: $_"
+    Write-Error "Setup failed: $_"
     exit 1
 }
