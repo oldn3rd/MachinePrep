@@ -67,6 +67,12 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     Write-Host "Please run this script as Administrator!" -ForegroundColor Red
     exit 1
 }
+Test-NuGetProvider
+
+Install-ChocoPackage -PackageName "git"
+Install-ChocoPackage -PackageName "vscode"
+Install-ChocoPackage -PackageName "7zip"
+
 
 # ========== Chocolatey ==========
 $choco = Get-Command choco.exe -ErrorAction SilentlyContinue
@@ -176,6 +182,70 @@ if (-not (Get-Command az -ErrorAction SilentlyContinue) -or $ForceReinstall) {
         Write-Log "Azure CLI upgrade failed: $_" "Warning"
     }
 }
+function Test-NuGetProvider {
+    <#
+    .SYNOPSIS
+        Ensures the NuGet package provider is installed silently.
+    .DESCRIPTION
+        Checks for the required NuGet provider and installs it if missing.
+        Suppresses prompts and uses TLS 1.2 to avoid legacy protocol errors.
+    .OUTPUTS
+        Writes status to host.
+    #>
+
+    Write-Host "[+] Checking NuGet provider..." -ForegroundColor Cyan
+
+    try {
+        # Ensure secure connection protocols are enabled
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+        $nuget = Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue
+        if (-not $nuget) {
+            Write-Host "[*] NuGet provider not found. Installing..." -ForegroundColor Yellow
+            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
+            Write-Host "[✓] NuGet provider installed successfully." -ForegroundColor Green
+        } else {
+            Write-Host "[✓] NuGet provider already installed." -ForegroundColor Green
+        }
+    } catch {
+        Write-Host "[✗] Failed to install NuGet provider: $($_.Exception.Message)" -ForegroundColor Red
+        throw
+    }
+}
+
+function Install-ChocoPackage {
+    <#
+    .SYNOPSIS
+        Installs Chocolatey packages quietly; only displays errors or success.
+    #>
+    param (
+        [Parameter(Mandatory)][string]$PackageName
+    )
+
+    Write-Host "[+] Installing $PackageName via Chocolatey..." -ForegroundColor Cyan
+
+    $chocoArgs = @(
+        "install", $PackageName,
+        "--yes",
+        "--no-progress",
+        "--limit-output"
+    )
+
+    try {
+        $result = choco @chocoArgs 2>&1 | Where-Object { $_ -match 'error|fail|not found' }
+
+        if ($result) {
+            Write-Host "[✗] Error installing $PackageName:" -ForegroundColor Red
+            $result | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
+        } else {
+            Write-Host "[✓] $PackageName installed successfully." -ForegroundColor Green
+        }
+    } catch {
+        Write-Host "[✗] Exception during install of $PackageName: $($_.Exception.Message)" -ForegroundColor Red
+    }
+}
+
+
 <#
 # ========== Microsoft 365 CLI ==========
 Write-Log "Checking for Microsoft 365 CLI (m365)..."
