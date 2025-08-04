@@ -94,8 +94,8 @@ $modules = @(
     @{ Name = "MicrosoftTeams"; Source = "PSGallery" },                                 # Teams administration
     @{ Name = "Defender"; Source = "PSGallery" },                                       # Microsoft Defender management
     @{ Name = "SharePointPnPPowerShellOnline"; Source = "PSGallery" },                 # PnP module for SharePoint/Teams/Groups automation
-    @{ Name = "Microsoft.Online.SharePoint.PowerShell"; Source = "PSGallery" },        # SharePoint tenant admin (Connect-SPOService)
-    @{ Name = "Teams"; Source = "PSGallery" }                                           # Legacy Teams module (usually safe to drop, but retained for backward compatibility)
+    @{ Name = "Microsoft.Online.SharePoint.PowerShell"; Source = "PSGallery" }.        # SharePoint tenant admin (Connect-SPOService)
+
 )
 
 Write-Host " Checking and installing/updating required PowerShell modules..."
