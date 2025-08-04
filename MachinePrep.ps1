@@ -78,7 +78,7 @@ if (-not $choco -or $ForceReinstall) {
     try {
         Set-ExecutionPolicy Bypass -Scope Process -Force
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        iex ((New-Object Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        Invoke-Expression ((New-Object Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
         Write-Log "Chocolatey installed successfully."
     } catch {
         Write-Log "Chocolatey install failed: $_" "Error"
@@ -210,12 +210,12 @@ function Install-ChocoPackage {
         $result = choco @chocoArgs 2>&1 | Where-Object { $_ -match 'error|fail|not found' }
 
         if ($result) {
-            Write-Host "[✗] Error installing $PackageName:" -ForegroundColor Red
+            Write-Host "[✗] Error installing $PackageName :" -ForegroundColor Red
             $result | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
         } else {
             Write-Host "[✓] $PackageName installed successfully." -ForegroundColor Green
         }
     } catch {
-        Write-Host "[✗] Exception during install of $PackageName: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[✗] Exception during install of $PackageName  $($_.Exception.Message)" -ForegroundColor Red
     }
 }
