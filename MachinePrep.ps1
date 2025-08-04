@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    All-in-one Windows admin workstation prep. Installs tools, modules, CLIs, logs everything. Run from GT or PowerShell Gallery.
+    All-in-one Windows admin workstation prep. Installs tools, modules, CLIs, logs everything.
 .PARAMETER ForceReinstall
     Force reinstall of Git/Choco/Node/AzureCLI/m365 even if detected.
 .PARAMETER Silent
@@ -10,7 +10,7 @@
 .PARAMETER DebugOutput
     Enables verbose log/debug lines.
 .NOTES
-    Version: 2.0.1
+    Version: 2.1.0
     Author: oldn3rd
 #>
 
@@ -24,7 +24,7 @@ param (
 
 Set-StrictMode -Version Latest
 
-$ScriptVersion = '2.0.1'
+$ScriptVersion = '2.1.0'
 $LogFile = Join-Path (Get-Location).Path "bootstrap.log"
 
 # ========== Logging ==========
@@ -67,12 +67,9 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     Write-Host "Please run this script as Administrator!" -ForegroundColor Red
     exit 1
 }
+
+# ========== Ensure NuGet ==========
 Test-NuGetProvider
-
-Install-ChocoPackage -PackageName "git"
-Install-ChocoPackage -PackageName "vscode"
-Install-ChocoPackage -PackageName "7zip"
-
 
 # ========== Chocolatey ==========
 $choco = Get-Command choco.exe -ErrorAction SilentlyContinue
@@ -91,34 +88,11 @@ if (-not $choco -or $ForceReinstall) {
     Write-Log "Chocolatey is already installed."
 }
 
-# ========== Git ==========
-$env:Path = [Environment]::GetEnvironmentVariable("Path","Machine")
-$git = Get-Command git.exe -ErrorAction SilentlyContinue
-if (-not $git -or $ForceReinstall) {
-    Write-Log "Installing Git via Chocolatey..."
-    try {
-        choco install git -y --no-progress
-        Write-Log "Git installed successfully."
-    } catch {
-        Write-Log "Git install failed: $_" "Error"
-        exit 11
-    }
-} else {
-    Write-Log "Git is already installed."
-}
-
-# ========== Node.js (for m365 CLI) ==========
-if (-not (Get-Command npm -ErrorAction SilentlyContinue) -or $ForceReinstall) {
-    Write-Log "Node.js/npm not found or force reinstall. Installing via Chocolatey..."
-    try {
-        choco install nodejs -y --no-progress
-        Write-Log "Node.js installed successfully."
-    } catch {
-        Write-Log "Node.js install failed: $_" "Error"
-    }
-} else {
-    Write-Log "Node.js/npm already present."
-}
+# ========== Install Common Tools ==========
+Install-ChocoPackage -PackageName "git"
+Install-ChocoPackage -PackageName "vscode"
+Install-ChocoPackage -PackageName "7zip"
+Install-ChocoPackage -PackageName "nodejs"  # for m365 CLI
 
 # ========== PowerShell Modules ==========
 $modules = @(
@@ -182,23 +156,28 @@ if (-not (Get-Command az -ErrorAction SilentlyContinue) -or $ForceReinstall) {
         Write-Log "Azure CLI upgrade failed: $_" "Warning"
     }
 }
+
+# ========== PowerShell Help ==========
+Write-Log "Updating PowerShell Help..."
+try {
+    Update-Help -Force -ErrorAction Continue
+    Write-Log "Help updated successfully."
+} catch {
+    Write-Log "Help update failed: $_" "Warning"
+}
+
+Write-Log "==== MachinePrep.ps1 Completed ===="
+Write-Host "All done! See 'bootstrap.log' for details." -ForegroundColor Green
+exit 0
+
+# ============================
+# SUPPORTING FUNCTIONS BELOW
+# ============================
+
 function Test-NuGetProvider {
-    <#
-    .SYNOPSIS
-        Ensures the NuGet package provider is installed silently.
-    .DESCRIPTION
-        Checks for the required NuGet provider and installs it if missing.
-        Suppresses prompts and uses TLS 1.2 to avoid legacy protocol errors.
-    .OUTPUTS
-        Writes status to host.
-    #>
-
     Write-Host "[+] Checking NuGet provider..." -ForegroundColor Cyan
-
     try {
-        # Ensure secure connection protocols are enabled
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
         $nuget = Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue
         if (-not $nuget) {
             Write-Host "[*] NuGet provider not found. Installing..." -ForegroundColor Yellow
@@ -214,10 +193,6 @@ function Test-NuGetProvider {
 }
 
 function Install-ChocoPackage {
-    <#
-    .SYNOPSIS
-        Installs Chocolatey packages quietly; only displays errors or success.
-    #>
     param (
         [Parameter(Mandatory)][string]$PackageName
     )
@@ -244,37 +219,3 @@ function Install-ChocoPackage {
         Write-Host "[✗] Exception during install of $PackageName: $($_.Exception.Message)" -ForegroundColor Red
     }
 }
-
-
-<#
-# ========== Microsoft 365 CLI ==========
-Write-Log "Checking for Microsoft 365 CLI (m365)..."
-if (-not (Get-Command m365 -ErrorAction SilentlyContinue) -or $ForceReinstall) {
-    if (Get-Command npm -ErrorAction SilentlyContinue) {
-        Write-Log "Installing Microsoft 365 CLI via npm..."
-        try {
-            npm install -g @pnp/cli-microsoft365
-            Write-Log "Microsoft 365 CLI installed."
-        } catch {
-            Write-Log "Failed to install Microsoft 365 CLI: $_" "Error"
-        }
-    } else {
-        Write-Log "Skipping m365 CLI — npm not found." "Warning"
-    }
-} else {
-    Write-Log "Microsoft 365 CLI already installed."
-}
-#>
-# ========== PowerShell Help ==========
-Write-Log "Updating PowerShell Help..."
-try {
-    Update-Help -Force -ErrorAction Continue
-    Write-Log "Help updated successfully."
-} catch {
-    Write-Log "Help update failed: $_" "Warning"
-}
-
-Write-Log "==== MachinePrep.ps1 Completed ===="
-Write-Host "All done! See 'bootstrap.log' for details." -ForegroundColor Green
-exit 0
-
