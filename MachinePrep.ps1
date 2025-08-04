@@ -1,5 +1,31 @@
-$ScriptVersion = '1.5.1'
-$LogFile = Join-Path $PSScriptRoot "bootstrap.log"
+<#
+.SYNOPSIS
+    All-in-one Windows admin workstation prep. Installs tools, modules, CLIs, logs everything. Run from GT or PowerShell Gallery.
+.PARAMETER ForceReinstall
+    Force reinstall of Git/Choco/Node/AzureCLI/m365 even if detected.
+.PARAMETER Silent
+    Suppress most console output (still logs to bootstrap.log).
+.PARAMETER NoBanner
+    Suppress the banner/header output.
+.PARAMETER DebugOutput
+    Enables verbose log/debug lines.
+.NOTES
+    Version: 2.0
+    Author: oldn3rd
+#>
+
+[CmdletBinding()]
+param (
+    [switch]$ForceReinstall,
+    [switch]$Silent,
+    [switch]$NoBanner,
+    [switch]$DebugOutput
+)
+
+Set-StrictMode -Version Latest
+
+$ScriptVersion = '2.0'
+$LogFile = Join-Path (Get-Location).Path "bootstrap.log"
 
 # ========== Logging ==========
 function Write-Log {
@@ -14,20 +40,70 @@ function Write-Log {
 
     Add-Content -Path $LogFile -Value $line
 
-    $color = switch ($Level) {
-        "Error"   { "Red" }
-        "Warning" { "Yellow" }
-        "Debug"   { "Cyan" }
-        default   { "Gray" }
+    if (-not $Silent) {
+        $color = switch ($Level) {
+            "Error"   { "Red" }
+            "Warning" { "Yellow" }
+            "Debug"   { "Cyan" }
+            default   { "Gray" }
+        }
+        if ($Level -eq "Debug" -and -not $DebugOutput) { return }
+        Write-Host $line -ForegroundColor $color
     }
-    Write-Host $line -ForegroundColor $color
 }
 
+# ========== Banner ==========
+if (-not $NoBanner -and -not $Silent) {
+    Write-Host "=========================================="
+    Write-Host " MachinePrep.ps1 - Version $ScriptVersion"
+    Write-Host " (c) 2025 oldn3rd"
+    Write-Host "=========================================="
+}
 Write-Log "==== MachinePrep.ps1 Started (v$ScriptVersion) ===="
 
-# ========== Node.js for m365 CLI ==========
-if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-    Write-Log "Node.js/npm not found. Installing via Chocolatey..."
+# ========== Admin Rights ==========
+if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)) {
+    Write-Log "Script must be run as Administrator!" "Error"
+    Write-Host "Please run this script as Administrator!" -ForegroundColor Red
+    exit 1
+}
+
+# ========== Chocolatey ==========
+$choco = Get-Command choco.exe -ErrorAction SilentlyContinue
+if (-not $choco -or $ForceReinstall) {
+    Write-Log "Installing Chocolatey..."
+    try {
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        iex ((New-Object Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        Write-Log "Chocolatey installed successfully."
+    } catch {
+        Write-Log "Chocolatey install failed: $_" "Error"
+        exit 10
+    }
+} else {
+    Write-Log "Chocolatey is already installed."
+}
+
+# ========== Git ==========
+$env:Path = [Environment]::GetEnvironmentVariable("Path","Machine")
+$git = Get-Command git.exe -ErrorAction SilentlyContinue
+if (-not $git -or $ForceReinstall) {
+    Write-Log "Installing Git via Chocolatey..."
+    try {
+        choco install git -y --no-progress
+        Write-Log "Git installed successfully."
+    } catch {
+        Write-Log "Git install failed: $_" "Error"
+        exit 11
+    }
+} else {
+    Write-Log "Git is already installed."
+}
+
+# ========== Node.js (for m365 CLI) ==========
+if (-not (Get-Command npm -ErrorAction SilentlyContinue) -or $ForceReinstall) {
+    Write-Log "Node.js/npm not found or force reinstall. Installing via Chocolatey..."
     try {
         choco install nodejs -y --no-progress
         Write-Log "Node.js installed successfully."
@@ -38,7 +114,7 @@ if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
     Write-Log "Node.js/npm already present."
 }
 
-# ========== PowerShell Module Install/Update ==========
+# ========== PowerShell Modules ==========
 $modules = @(
     @{ Name = "Microsoft.Graph"; Source = "PSGallery" },
     @{ Name = "ExchangeOnlineManagement"; Source = "PSGallery" },
@@ -80,7 +156,7 @@ foreach ($mod in $modules) {
 
 # ========== Azure CLI ==========
 Write-Log "Checking for Azure CLI..."
-if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+if (-not (Get-Command az -ErrorAction SilentlyContinue) -or $ForceReinstall) {
     Write-Log "Installing Azure CLI..."
     $installer = "$env:TEMP\AzureCLI.msi"
     try {
@@ -103,7 +179,7 @@ if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
 
 # ========== Microsoft 365 CLI ==========
 Write-Log "Checking for Microsoft 365 CLI (m365)..."
-if (-not (Get-Command m365 -ErrorAction SilentlyContinue)) {
+if (-not (Get-Command m365 -ErrorAction SilentlyContinue) -or $ForceReinstall) {
     if (Get-Command npm -ErrorAction SilentlyContinue) {
         Write-Log "Installing Microsoft 365 CLI via npm..."
         try {
@@ -129,4 +205,6 @@ try {
 }
 
 Write-Log "==== MachinePrep.ps1 Completed ===="
-Exit 0
+Write-Host "All done! See 'bootstrap.log' for details." -ForegroundColor Green
+exit 0
+
