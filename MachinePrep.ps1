@@ -10,7 +10,7 @@
 .PARAMETER DebugOutput
     Enables verbose log/debug lines.
 .NOTES
-    Version: 2.0
+    Version: 2.0.1
     Author: oldn3rd
 #>
 
@@ -24,7 +24,7 @@ param (
 
 Set-StrictMode -Version Latest
 
-$ScriptVersion = '2.0'
+$ScriptVersion = '2.0.1'
 $LogFile = Join-Path (Get-Location).Path "bootstrap.log"
 
 # ========== Logging ==========
