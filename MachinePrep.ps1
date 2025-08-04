@@ -176,7 +176,7 @@ if (-not (Get-Command az -ErrorAction SilentlyContinue) -or $ForceReinstall) {
         Write-Log "Azure CLI upgrade failed: $_" "Warning"
     }
 }
-
+<#
 # ========== Microsoft 365 CLI ==========
 Write-Log "Checking for Microsoft 365 CLI (m365)..."
 if (-not (Get-Command m365 -ErrorAction SilentlyContinue) -or $ForceReinstall) {
@@ -194,7 +194,7 @@ if (-not (Get-Command m365 -ErrorAction SilentlyContinue) -or $ForceReinstall) {
 } else {
     Write-Log "Microsoft 365 CLI already installed."
 }
-
+#>
 # ========== PowerShell Help ==========
 Write-Log "Updating PowerShell Help..."
 try {
