@@ -1,47 +1,17 @@
-# MachinePrep
+# MachinePrep.ps1
 
-**Version:** 1.0.0  
-**Author:** [oldn3rd](https://github.com/oldn3rd)  
-**Purpose:** Prepare a fresh Windows workstation or admin VM with essential tools, PowerShell modules, and CLI utilities for IT administrators.
+A single PowerShell script to fully prepare a Windows admin workstation for managing Microsoft 365, Intune, Azure, and Windows environments.
 
----
-
-## 📦 Features
-
-- Checks for admin rights and internet connectivity
-- Installs:
-  - Chocolatey (if missing)
-  - Azure CLI
-  - Microsoft 365 CLI (if Node.js is present)
-- Adds RSAT features (Active Directory & Group Policy) based on OS type
-- Installs and updates essential PowerShell modules:
-  - Microsoft.Graph
-  - ExchangeOnlineManagement
-  - AzureAD & MSOnline
-  - Az
-  - MicrosoftTeams
-  - SharePointPnPPowerShellOnline
-  - Microsoft.Online.SharePoint.PowerShell
-  - Defender
-  - SharePointOnline
-  - Teams
-- Fully scriptable, modular, and rerunnable (safe to re-execute)
+- Installs required PowerShell modules, CLIs, and supporting tools
+- Logs all output to `bootstrap.log` in the current directory
+- Safe to re-run — handles idempotent installs and updates
+- No cloning or setup needed — just run it via a one-liner
 
 ---
 
-## 📁 Repo Structure
+## 🚀 Quick Start
 
-```
-MachinePrep/
-├── LICENSE
-├── README.md
-├── MachinePrep.ps1           # The main prep script
-└── PreMachinePrep.ps1        # Bootstraps Git + Choco + pulls repo and runs MachinePrep
-```
-
----
-
-## 🚀 Quick Start (One-Liner)
+> Open **PowerShell as Administrator**, then run:
 
 ```powershell
 Set-ExecutionPolicy Bypass -Scope Process -Force; `
@@ -51,23 +21,62 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercon
 
 ---
 
-## 🛠 Requirements
+## 🛠️ What It Installs
 
-- Windows 10/11 or Windows Server 2016+
-- Admin privileges
-- Internet access
-- Optional: Node.js + npm (to install Microsoft 365 CLI)
+- Chocolatey (if missing)
+- Git (if missing)
+- Node.js (for Microsoft 365 CLI)
+- Azure CLI
+- Microsoft 365 CLI (`m365`)
+- PowerShell modules:
+  - Microsoft.Graph
+  - MicrosoftTeams
+  - ExchangeOnlineManagement
+  - Az
+  - SharePointPnPPowerShellOnline
+  - Defender
+  - Microsoft.Online.SharePoint.PowerShell
 
 ---
 
-## 💡 Notes
+## ⚙️ Script Parameters
 
-- Safe to run multiple times; tools/modules will be checked and updated as needed.
-- Logs and errors are printed inline for debugging.
-- Can be used in automated setup pipelines or manually on-demand.
+You can run the script with the following options (when downloaded locally):
+
+| Parameter         | Description                                      |
+|------------------|--------------------------------------------------|
+| `-ForceReinstall` | Forces reinstall of all tools and modules       |
+| `-Silent`         | Suppresses most console output (logs remain)    |
+| `-NoBanner`       | Skips the header/banner output                  |
+| `-DebugOutput`    | Enables verbose debug messages                  |
+
+**Example:**
+```powershell
+.\MachinePrep.ps1 -ForceReinstall -DebugOutput
+```
 
 ---
 
-## 📃 License
+## 📄 Logging
 
-MIT License — see [LICENSE](LICENSE)
+All actions and errors are logged to `bootstrap.log` in the directory where the script is executed.
+
+---
+
+## ❗ Note
+
+`PreMachinePrep.ps1` has been retired.  
+Use only `MachinePrep.ps1` moving forward.
+
+---
+
+## 🙋‍♂️ Support
+
+Questions, issues, or suggestions?  
+Open a GitHub issue or contact [oldn3rd](https://github.com/oldn3rd).
+
+---
+
+## 📄 License
+
+MIT License © 2025 oldn3rd
