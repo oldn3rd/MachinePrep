@@ -129,3 +129,4 @@ try {
 }
 
 Write-Log "==== MachinePrep.ps1 Completed ===="
+Exit 0
