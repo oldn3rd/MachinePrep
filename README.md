@@ -46,7 +46,7 @@ MachinePrep/
 ```powershell
 Set-ExecutionPolicy Bypass -Scope Process -Force; `
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; `
-iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/oldn3rd/MachinePrep/main/PreMachinePrep.ps1'))
+iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/oldn3rd/MachinePrep/main/MachinePrep.ps1'))
 ```
 
 ---
