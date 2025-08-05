@@ -26,6 +26,23 @@ Set-StrictMode -Version Latest
 
 $ScriptVersion = '2.1.0'
 $LogFile = Join-Path (Get-Location).Path "bootstrap.log"
+function Test-NuGetProvider {
+    Write-Host "[+] Checking NuGet provider..." -ForegroundColor Cyan
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $nuget = Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue
+        if (-not $nuget) {
+            Write-Host "[*] NuGet provider not found. Installing..." -ForegroundColor Yellow
+            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
+            Write-Host "[✓] NuGet provider installed successfully." -ForegroundColor Green
+        } else {
+            Write-Host "[✓] NuGet provider already installed." -ForegroundColor Green
+        }
+    } catch {
+        Write-Host "[✗] Failed to install NuGet provider: $($_.Exception.Message)" -ForegroundColor Red
+        throw
+    }
+}
 
 # ========== Logging ==========
 function Write-Log {
@@ -174,23 +191,7 @@ exit 0
 # SUPPORTING FUNCTIONS BELOW
 # ============================
 
-function Test-NuGetProvider {
-    Write-Host "[+] Checking NuGet provider..." -ForegroundColor Cyan
-    try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        $nuget = Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue
-        if (-not $nuget) {
-            Write-Host "[*] NuGet provider not found. Installing..." -ForegroundColor Yellow
-            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
-            Write-Host "[✓] NuGet provider installed successfully." -ForegroundColor Green
-        } else {
-            Write-Host "[✓] NuGet provider already installed." -ForegroundColor Green
-        }
-    } catch {
-        Write-Host "[✗] Failed to install NuGet provider: $($_.Exception.Message)" -ForegroundColor Red
-        throw
-    }
-}
+
 
 function Install-ChocoPackage {
     param (
