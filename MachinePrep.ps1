@@ -10,7 +10,7 @@
 .PARAMETER DebugOutput
     Enables verbose log/debug lines.
 .NOTES
-    Version: 2.1.0
+    Version: 2.1.1
     Author: oldn3rd
 #>
 
@@ -23,26 +23,8 @@ param (
 )
 
 Set-StrictMode -Version Latest
-
-$ScriptVersion = '2.1.0'
+$ScriptVersion = '2.1.1'
 $LogFile = Join-Path (Get-Location).Path "bootstrap.log"
-function Test-NuGetProvider {
-    Write-Host "[+] Checking NuGet provider..." -ForegroundColor Cyan
-    try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        $nuget = Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue
-        if (-not $nuget) {
-            Write-Host "[*] NuGet provider not found. Installing..." -ForegroundColor Yellow
-            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
-            Write-Host "[✓] NuGet provider installed successfully." -ForegroundColor Green
-        } else {
-            Write-Host "[✓] NuGet provider already installed." -ForegroundColor Green
-        }
-    } catch {
-        Write-Host "[✗] Failed to install NuGet provider: $($_.Exception.Message)" -ForegroundColor Red
-        throw
-    }
-}
 
 # ========== Logging ==========
 function Write-Log {
@@ -85,7 +67,7 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     exit 1
 }
 
-# ========== Ensure NuGet ==========
+# ========== Ensure NuGet Provider ==========
 Test-NuGetProvider
 
 # ========== Chocolatey ==========
@@ -105,11 +87,11 @@ if (-not $choco -or $ForceReinstall) {
     Write-Log "Chocolatey is already installed."
 }
 
-# ========== Install Common Tools ==========
+# ========== Install Packages ==========
 Install-ChocoPackage -PackageName "git"
 Install-ChocoPackage -PackageName "vscode"
 Install-ChocoPackage -PackageName "7zip"
-Install-ChocoPackage -PackageName "nodejs"  # for m365 CLI
+Install-ChocoPackage -PackageName "nodejs"
 
 # ========== PowerShell Modules ==========
 $modules = @(
@@ -187,24 +169,33 @@ Write-Log "==== MachinePrep.ps1 Completed ===="
 Write-Host "All done! See 'bootstrap.log' for details." -ForegroundColor Green
 exit 0
 
-# ============================
-# SUPPORTING FUNCTIONS BELOW
-# ============================
+# ================================
+# FUNCTIONS
+# ================================
 
 function Test-NuGetProvider {
-    Write-Host "[+] Checking NuGet provider..." -ForegroundColor Cyan
+    Write-Log "Ensuring NuGet provider is available..."
+
+    $providerUrl = "https://onegetcdn.azureedge.net/providers/Microsoft.PackageManagement.NuGetProvider-2.8.5.208.dll"
+    $providerPath = "$env:ProgramFiles\PackageManagement\ProviderAssemblies\nuget\2.8.5.208"
+    $providerFile = Join-Path $providerPath "Microsoft.PackageManagement.NuGetProvider.dll"
+
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        $nuget = Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue
-        if (-not $nuget) {
-            Write-Host "[*] NuGet provider not found. Installing..." -ForegroundColor Yellow
-            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
-            Write-Host "[!] NuGet provider installed successfully." -ForegroundColor Green
+
+        if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
+            if (-not (Test-Path $providerFile)) {
+                Write-Log "Downloading NuGet provider manually..."
+                New-Item -ItemType Directory -Path $providerPath -Force | Out-Null
+                Invoke-WebRequest -Uri $providerUrl -OutFile $providerFile -UseBasicParsing
+            }
+            Import-PackageProvider -Name NuGet -Force
+            Write-Log "NuGet provider imported successfully."
         } else {
-            Write-Host "[!] NuGet provider already installed." -ForegroundColor Green
+            Write-Log "NuGet provider already installed."
         }
     } catch {
-        Write-Host "[X] Failed to install NuGet provider : $($_.Exception.Message)" -ForegroundColor Red
+        Write-Log "NuGet provider install/import failed: $($_.Exception.Message)" "Error"
         throw
     }
 }
@@ -214,8 +205,7 @@ function Install-ChocoPackage {
         [Parameter(Mandatory)][string]$PackageName
     )
 
-    Write-Host "[+] Installing $PackageName via Chocolatey..." -ForegroundColor Cyan
-
+    Write-Log "Installing package: $PackageName"
     $chocoArgs = @(
         "install", $PackageName,
         "--yes",
@@ -227,12 +217,11 @@ function Install-ChocoPackage {
         $result = choco @chocoArgs 2>&1 | Where-Object { $_ -match 'error|fail|not found' }
 
         if ($result) {
-            Write-Host "[X] Error installing $PackageName :" -ForegroundColor Red
-            $result | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
+            Write-Log "Error installing $PackageName :`n$result" "Error"
         } else {
-            Write-Host "[!] $PackageName installed successfully." -ForegroundColor Green
+            Write-Log "$PackageName installed successfully."
         }
     } catch {
-        Write-Host "[X] Exception during install of $PackageName  $($_.Exception.Message)" -ForegroundColor Red
+        Write-Log "Exception during install of $PackageName : $($_.Exception.Message)" "Error"
     }
 }
