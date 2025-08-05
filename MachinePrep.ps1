@@ -182,12 +182,12 @@ function Test-NuGetProvider {
         if (-not $nuget) {
             Write-Host "[*] NuGet provider not found. Installing..." -ForegroundColor Yellow
             Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
-            Write-Host "[✓] NuGet provider installed successfully." -ForegroundColor Green
+            Write-Host "[!] NuGet provider installed successfully." -ForegroundColor Green
         } else {
-            Write-Host "[✓] NuGet provider already installed." -ForegroundColor Green
+            Write-Host "[!] NuGet provider already installed." -ForegroundColor Green
         }
     } catch {
-        Write-Host "[✗] Failed to install NuGet provider: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[X] Failed to install NuGet provider : $($_.Exception.Message)" -ForegroundColor Red
         throw
     }
 }
@@ -210,12 +210,12 @@ function Install-ChocoPackage {
         $result = choco @chocoArgs 2>&1 | Where-Object { $_ -match 'error|fail|not found' }
 
         if ($result) {
-            Write-Host "[✗] Error installing $PackageName :" -ForegroundColor Red
+            Write-Host "[X] Error installing $PackageName :" -ForegroundColor Red
             $result | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
         } else {
-            Write-Host "[✓] $PackageName installed successfully." -ForegroundColor Green
+            Write-Host "[!] $PackageName installed successfully." -ForegroundColor Green
         }
     } catch {
-        Write-Host "[✗] Exception during install of $PackageName  $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[X] Exception during install of $PackageName  $($_.Exception.Message)" -ForegroundColor Red
     }
 }
