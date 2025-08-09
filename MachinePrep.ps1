@@ -10,9 +10,13 @@
 .PARAMETER DebugOutput
     Enables verbose log/debug lines.
 .NOTES
-    Version: 2.1.1
-    Author: oldn3rd
+    Version: 2.1.2
+    Author: oldn3rd (updated with GPT-5 enhancements)
 #>
+
+# ================================
+# PARAMETERS
+# ================================
 
 [CmdletBinding()]
 param (
@@ -22,11 +26,10 @@ param (
     [switch]$DebugOutput
 )
 
-Set-StrictMode -Version Latest
-$ScriptVersion = '2.1.1'
-$LogFile = Join-Path (Get-Location).Path "bootstrap.log"
+# ================================
+# FUNCTIONS
+# ================================
 
-# ========== Logging ==========
 function Write-Log {
     param ([string]$Message, [string]$Level = "Info")
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -50,128 +53,6 @@ function Write-Log {
         Write-Host $line -ForegroundColor $color
     }
 }
-
-# ========== Banner ==========
-if (-not $NoBanner -and -not $Silent) {
-    Write-Host "=========================================="
-    Write-Host " MachinePrep.ps1 - Version $ScriptVersion"
-    Write-Host " (c) 2025 oldn3rd"
-    Write-Host "=========================================="
-}
-Write-Log "==== MachinePrep.ps1 Started (v$ScriptVersion) ===="
-
-# ========== Admin Rights ==========
-if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)) {
-    Write-Log "Script must be run as Administrator!" "Error"
-    Write-Host "Please run this script as Administrator!" -ForegroundColor Red
-    exit 1
-}
-
-# ========== Ensure NuGet Provider ==========
-Test-NuGetProvider
-
-# ========== Chocolatey ==========
-$choco = Get-Command choco.exe -ErrorAction SilentlyContinue
-if (-not $choco -or $ForceReinstall) {
-    Write-Log "Installing Chocolatey..."
-    try {
-        Set-ExecutionPolicy Bypass -Scope Process -Force
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-Expression ((New-Object Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-        Write-Log "Chocolatey installed successfully."
-    } catch {
-        Write-Log "Chocolatey install failed: $_" "Error"
-        exit 10
-    }
-} else {
-    Write-Log "Chocolatey is already installed."
-}
-
-# ========== Install Packages ==========
-Install-ChocoPackage -PackageName "git"
-Install-ChocoPackage -PackageName "vscode"
-Install-ChocoPackage -PackageName "7zip"
-Install-ChocoPackage -PackageName "nodejs"
-
-# ========== PowerShell Modules ==========
-$modules = @(
-    @{ Name = "Microsoft.Graph"; Source = "PSGallery" },
-    @{ Name = "ExchangeOnlineManagement"; Source = "PSGallery" },
-    @{ Name = "AzureAD"; Source = "PSGallery" },
-    @{ Name = "MSOnline"; Source = "PSGallery" },
-    @{ Name = "Az"; Source = "PSGallery" },
-    @{ Name = "MicrosoftTeams"; Source = "PSGallery" },
-    @{ Name = "SharePointPnPPowerShellOnline"; Source = "PSGallery" },
-    @{ Name = "Defender"; Source = "PSGallery" },
-    @{ Name = "Microsoft.Online.SharePoint.PowerShell"; Source = "PSGallery" }
-)
-
-Write-Log "Checking and installing/updating required PowerShell modules..."
-foreach ($mod in $modules) {
-    try {
-        $installedModule = Get-Module -ListAvailable -Name $mod.Name | Sort-Object Version -Descending | Select-Object -First 1
-        $latestModule = Find-Module -Name $mod.Name -Repository $mod.Source -ErrorAction SilentlyContinue
-
-        if ($null -eq $latestModule) {
-            Write-Log "Module '$($mod.Name)' not found in $($mod.Source)" "Warning"
-            continue
-        }
-
-        if (-not $installedModule) {
-            Write-Log "Installing module: $($mod.Name)..."
-            Install-Module -Name $mod.Name -Force -AllowClobber -Scope AllUsers -ErrorAction Stop
-            Write-Log "Installed $($mod.Name)"
-        } elseif ($installedModule.Version -lt $latestModule.Version) {
-            Write-Log "Updating module: $($mod.Name) from $($installedModule.Version) to $($latestModule.Version)..."
-            Update-Module -Name $mod.Name -Force -ErrorAction Stop
-            Write-Log "Updated $($mod.Name)"
-        } else {
-            Write-Log "Module $($mod.Name) is up-to-date (version $($installedModule.Version))"
-        }
-    } catch {
-        Write-Log "Failed to process module $($mod.Name): $_" "Error"
-    }
-}
-
-# ========== Azure CLI ==========
-Write-Log "Checking for Azure CLI..."
-if (-not (Get-Command az -ErrorAction SilentlyContinue) -or $ForceReinstall) {
-    Write-Log "Installing Azure CLI..."
-    $installer = "$env:TEMP\AzureCLI.msi"
-    try {
-        Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile $installer -UseBasicParsing
-        Start-Process msiexec.exe -Wait -ArgumentList "/i `"$installer`" /quiet"
-        Remove-Item $installer -Force
-        Write-Log "Azure CLI installed."
-    } catch {
-        Write-Log "Failed to install Azure CLI: $_" "Error"
-    }
-} else {
-    Write-Log "Azure CLI already installed. Attempting upgrade..."
-    try {
-        & az upgrade --yes --only-show-errors
-        Write-Log "Azure CLI is up-to-date."
-    } catch {
-        Write-Log "Azure CLI upgrade failed: $_" "Warning"
-    }
-}
-
-# ========== PowerShell Help ==========
-Write-Log "Updating PowerShell Help..."
-try {
-    Update-Help -Force -ErrorAction Continue
-    Write-Log "Help updated successfully."
-} catch {
-    Write-Log "Help update failed: $_" "Warning"
-}
-
-Write-Log "==== MachinePrep.ps1 Completed ===="
-Write-Host "All done! See 'bootstrap.log' for details." -ForegroundColor Green
-exit 0
-
-# ================================
-# FUNCTIONS
-# ================================
 
 function Test-NuGetProvider {
     Write-Log "Ensuring NuGet provider is available..."
@@ -225,3 +106,168 @@ function Install-ChocoPackage {
         Write-Log "Exception during install of $PackageName : $($_.Exception.Message)" "Error"
     }
 }
+
+function Invoke-WithRetry {
+    param (
+        [scriptblock]$Script,
+        [int]$MaxAttempts = 3,
+        [int]$DelaySeconds = 5
+    )
+    for ($i = 1; $i -le $MaxAttempts; $i++) {
+        try {
+            &$Script
+            return
+        } catch {
+            Write-Log "Attempt $i failed: $($_.Exception.Message)" "Warning"
+            if ($i -lt $MaxAttempts) { Start-Sleep -Seconds $DelaySeconds }
+            else { throw }
+        }
+    }
+}
+
+Set-StrictMode -Version Latest
+$ScriptVersion = '2.1.2'
+$LogFile = Join-Path (Get-Location).Path "logs\bootstrap-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
+
+# ================================
+# BANNER
+# ================================
+
+if (-not $NoBanner -and -not $Silent) {
+    Write-Host "=========================================="
+    Write-Host " MachinePrep.ps1 - Version $ScriptVersion"
+    Write-Host " (c) 2025 oldn3rd"
+    Write-Host "=========================================="
+}
+Write-Log "==== MachinePrep.ps1 Started (v$ScriptVersion) ===="
+
+# ================================
+# ADMIN CHECK
+# ================================
+
+if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)) {
+    Write-Log "Script must be run as Administrator!" "Error"
+    Write-Host "Please run this script as Administrator!" -ForegroundColor Red
+    exit 1
+}
+
+# ================================
+# REGISTRY CHECK
+# ================================
+$registryPath = "HKLM:\SOFTWARE\MachinePrep"
+$registryName = "SetupComplete"
+if (Test-Path $registryPath) {
+    $value = Get-ItemProperty -Path $registryPath -Name $registryName -ErrorAction SilentlyContinue
+    if ($value -and $value.$registryName -eq "Yes") {
+        Write-Log "MachinePrep has already been run on this system. Skipping redundant steps..." "Info"
+    }
+} else {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+
+# ================================
+# MAIN SCRIPT EXECUTION
+# ================================
+
+Test-NuGetProvider
+
+# Chocolatey install (with retry)
+$choco = Get-Command choco.exe -ErrorAction SilentlyContinue
+if (-not $choco -or $ForceReinstall) {
+    Write-Log "Installing Chocolatey..."
+    Invoke-WithRetry {
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-Expression ((New-Object Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+    }
+    Write-Log "Chocolatey installed successfully."
+} else {
+    Write-Log "Chocolatey is already installed."
+}
+
+# Package installs
+$packages = @("git", "vscode", "7zip", "nodejs", "powershell")
+foreach ($pkg in $packages) {
+    Invoke-WithRetry { Install-ChocoPackage -PackageName $pkg }
+}
+
+# PowerShell Modules
+$modules = @(
+    @{ Name = "Microsoft.Graph" },
+    @{ Name = "ExchangeOnlineManagement" },
+    @{ Name = "AzureAD" },
+    @{ Name = "MSOnline" },
+    @{ Name = "Az" },
+    @{ Name = "MicrosoftTeams" },
+    @{ Name = "SharePointPnPPowerShellOnline" },
+    @{ Name = "Defender" },
+    @{ Name = "Microsoft.Online.SharePoint.PowerShell" }
+)
+
+Write-Log "Checking and installing/updating required PowerShell modules..."
+foreach ($mod in $modules) {
+    try {
+        $installedModule = Get-Module -ListAvailable -Name $mod.Name | Sort-Object Version -Descending | Select-Object -First 1
+        $latestModule = Find-Module -Name $mod.Name -Repository PSGallery -ErrorAction SilentlyContinue
+
+        if (-not $latestModule) {
+            Write-Log "Module '$($mod.Name)' not found in PSGallery" "Warning"
+            continue
+        }
+
+        if (-not $installedModule) {
+            Write-Log "Installing module: $($mod.Name)..."
+            Install-Module -Name $mod.Name -Force -AllowClobber -Scope AllUsers -ErrorAction Stop
+            Write-Log "Installed $($mod.Name)"
+        } elseif ($installedModule.Version -lt $latestModule.Version) {
+            Write-Log "Updating module: $($mod.Name) from $($installedModule.Version) to $($latestModule.Version)..."
+            Update-Module -Name $mod.Name -Force -ErrorAction Stop
+            Write-Log "Updated $($mod.Name)"
+        } else {
+            Write-Log "Module $($mod.Name) is up-to-date (version $($installedModule.Version))"
+        }
+    } catch {
+        Write-Log "Failed to process module $($mod.Name): $_" "Error"
+    }
+}
+
+# Azure CLI
+Write-Log "Checking for Azure CLI..."
+if (-not (Get-Command az -ErrorAction SilentlyContinue) -or $ForceReinstall) {
+    Write-Log "Installing Azure CLI..."
+    $installer = "$env:TEMP\AzureCLI.msi"
+    try {
+        Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile $installer -UseBasicParsing
+        Start-Process msiexec.exe -Wait -ArgumentList "/i `"$installer`" /quiet"
+        Remove-Item $installer -Force
+        Write-Log "Azure CLI installed."
+    } catch {
+        Write-Log "Failed to install Azure CLI: $_" "Error"
+    }
+} else {
+    Write-Log "Azure CLI already installed. Attempting upgrade..."
+    try {
+        & az upgrade --yes --only-show-errors
+        Write-Log "Azure CLI is up-to-date."
+    } catch {
+        Write-Log "Azure CLI upgrade failed: $_" "Warning"
+    }
+}
+
+# Help
+Write-Log "Updating PowerShell Help..."
+try {
+    Update-Help -Force -ErrorAction Continue
+    Write-Log "Help updated successfully."
+} catch {
+    Write-Log "Help update failed: $_" "Warning"
+}
+
+# ================================
+# WRITE REGISTRY MARKER
+# ================================
+Set-ItemProperty -Path $registryPath -Name $registryName -Value "Yes"
+
+Write-Log "==== MachinePrep.ps1 Completed ===="
+Write-Host "All done! See 'logs' folder for details." -ForegroundColor Green
+exit 0
